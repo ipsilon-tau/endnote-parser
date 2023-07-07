@@ -7,3 +7,7 @@
 ## Install poetry
     
     curl -sSL https://install.python-poetry.org | python -
+
+## install git
+   
+    https://git-scm.com/download/win -> <64-bit Git for Windows Setup> -> install
