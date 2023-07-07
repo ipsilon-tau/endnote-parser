@@ -1,20 +1,33 @@
-import os
-import random
 import pathlib
 import sqlite3
-import uuid
-from urllib.parse import urlparse
-import requests
-import re
+import argparse
+from core import download_file, get_download_url, get_xpn_code, WaitingSpinnerError
 
 
-# we want to look like a regular internet user
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36'
-headers = {'User-Agent': USER_AGENT}
 
-# full path to initial enl file
-ENL_FILE = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.enl'
-DATA_DIR = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.Data'
+parser = argparse.ArgumentParser(description="EndNote parser",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("-l",
+                    "--limit",
+                    type=int,
+                    default=3,
+                    help="Limit how much refs to process")
+parser.add_argument("-o",
+                    "--offset",
+                    type=int,
+                    default=0,
+                    help="Refs offset amount")
+
+parser.add_argument("data-dir",
+                    help="Absolute path to *.Data directory location")
+args = parser.parse_args()
+config = vars(args)
+
+limit = config['limit']
+offset = config['offset']
+# full path to PROJECT *.Data folder
+DATA_DIR = config['data-dir']
+print(f'Fetching {limit} refs with offset {offset} from {DATA_DIR}')
 
 PDF_DIR = pathlib.Path(DATA_DIR) / 'PDF'
 
@@ -39,59 +52,11 @@ PDB_FILE = pathlib.Path(DATA_DIR) / 'sdb' / 'pdb.eni'
 # INSERT INTO file_res VALUES(137,'1747798923/Bauer William-A coffin.pdf',1,0);
 SDB_FILE = pathlib.Path(DATA_DIR) / 'sdb' / 'sdb.eni'
 
-def get_xpn_code(link):
-    # trying to get the XPN by matching with regular expression
-    m = re.match(r'.*XPN=(.*)', link)
-    # code is in expression group 1
-    code = m.group(1)
-    # return code
-    return code
-
-
-def get_download_url(source_xpn_code: str):
-    # meta request url
-    meta_url = f'https://rest.orbit.com/rest/iorbit/user/permalink/fampat/{source_xpn_code};fields=PDF'
-    # make request with our headers
-    response = requests.get(meta_url, headers=headers)
-    # get json response
-    resp_json = response.json()
-    # amount of pdf documents in metadata
-    amount_of_docs = len(resp_json['data']['documents'])
-    # here we only expect one document
-    assert amount_of_docs == 1
-    # get download_url from json
-    download_url = resp_json['data']['documents'][0]['PDF']
-    # return download_url
-    return download_url
-
-
-def get_random_directory():
-    # generate random directory name
-    directory_name = str(uuid.uuid4())
-    # compose directory path inside project data folder
-    directory_path = PDF_DIR / directory_name
-    # create folder
-    os.mkdir(directory_path)
-    return directory_path
-
-
-def download_file(link: str):
-    response = requests.get(link, stream=True, headers=headers)
-    filename = urlparse(response.url).path.split('/')[-1]
-    filepath = get_random_directory() / filename
-    with open(filepath, 'wb') as pdf_object:
-        pdf_object.write(response.content)
-    # make relative path with only last folder name in path
-    relative_path = str(filepath.relative_to(filepath.parent.parent))
-    return relative_path
-
-
 # Create a SQL connection to our SQLite database in SDB.eni file
 sdb_con = sqlite3.connect(SDB_FILE)
 sdb_cur = sdb_con.cursor()
 # delete trigger because we cannot insert with it (it has non-existent function EN_MAKE_SORT_KEY)
 sdb_cur.execute('DROP TRIGGER IF EXISTS file_res__refs_ord_AI')
-sdb_con.commit()
 
 # Create a SQL connection to our SQLite database in PDB.eni file
 pdb_con = sqlite3.connect(PDB_FILE)
@@ -101,19 +66,23 @@ pdb_cur = pdb_con.cursor()
 # read all records from target table
 # The result of a "cursor.execute" can be iterated over by row
 files = []
-for row in sdb_cur.execute('SELECT id, URL FROM refs limit 3;'):
+
+for row in sdb_cur.execute(f'SELECT id, URL FROM refs LIMIT {limit} OFFSET {offset};'):
     ref_id, url = row
     # split url by "\r" - looks like it is a delimiter
     urls = url.split('\r')
     print(f'Processing ref {ref_id}')
     for pos, url in enumerate(urls):
-        # print('url=', url)
         # get xpn code from the link
         xpn_code = get_xpn_code(url)
-        # get download_url from metapage
+        # get download_url from meta page
         download_url = get_download_url(xpn_code)
-        # print('download_url=', download_url)
-        pdf_path = download_file(download_url)
+        try:
+            pdf_path = download_file(PDF_DIR, download_url, ref_id)
+        except WaitingSpinnerError:
+            # not pdf file saved, skip
+            print(f'Caught waiting spinner instead of PDF, skipping')
+            continue
         print(f'Saved file {pdf_path} (pos {pos})')
 
         # collect data to files list
@@ -130,9 +99,9 @@ for file in files:
     pos = file['pos']
 
     # update pdf_index in pdb
-    pdb_cur.execute(f"INSERT INTO pdf_index (refs_id, subkey, contents) VALUES({ref_id},'{pdf_path}',replace('\n','\n',char(10)));")
+    pdb_cur.execute(f"INSERT OR IGNORE INTO pdf_index (refs_id, subkey, contents) VALUES({ref_id},'{pdf_path}',replace('\n','\n',char(10)));")
     # # update file_res in sdb
-    sdb_cur.execute(f"INSERT INTO file_res VALUES({ref_id},'{pdf_path}',1,{pos})")
+    sdb_cur.execute(f"INSERT OR IGNORE INTO file_res VALUES({ref_id},'{pdf_path}',1,{pos})")
 
 # Be sure to close the connections
 # recreate trigger
