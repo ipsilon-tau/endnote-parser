@@ -35,4 +35,5 @@
 
     # limit downloading to 75 references
     # set http request timeout 5 seconds
+    # disabled output buffering with python -u
     poetry run python -u main.py --timeout 5 --limit 75 /home/user/ENL-Sample/Questel-2000-07-06-sample111.Data
