@@ -4,12 +4,28 @@ from urllib.parse import urlparse
 import requests
 import re
 
+from requests import ConnectTimeout, ReadTimeout
 
 # we want to look like a regular internet user
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' \
              '(KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36'
 headers = {'User-Agent': USER_AGENT}
 
+
+class WaitingSpinnerError(Exception):
+    pass
+
+
+class NotPDFError(Exception):
+    pass
+
+
+class FileDownloadTimeoutError(Exception):
+    pass
+
+
+class MetaDownloadTimeoutError(Exception):
+    pass
 
 def get_xpn_code(link):
     # trying to get the XPN by matching with regular expression
@@ -20,11 +36,18 @@ def get_xpn_code(link):
     return code
 
 
-def get_download_url(source_xpn_code: str):
+def get_download_url(source_xpn_code: str, timeout):
     # meta request url
     meta_url = f'https://rest.orbit.com/rest/iorbit/user/permalink/fampat/{source_xpn_code};fields=PDF'
     # make request with our headers
-    response = requests.get(meta_url, headers=headers)
+    try:
+        response = requests.get(meta_url, headers=headers, timeout=timeout)
+    except ConnectTimeout:
+        raise MetaDownloadTimeoutError('Meta request has timed out - unable to get download link')
+    except ReadTimeout:
+        raise MetaDownloadTimeoutError('Meta request has timed out - unable to get download link')
+
+
     # get json response
     resp_json = response.json()
     # amount of pdf documents in metadata
@@ -52,17 +75,23 @@ def get_random_directory(pdf_dir: str, ref_id: int, pdf_filename):
     return directory_path
 
 
-class WaitingSpinnerError(Exception):
-    pass
+def download_file(pdf_dir, link: str, ref_id: int, timeout):
+    try:
+        response = requests.get(link, stream=True, headers=headers, timeout=timeout, allow_redirects=True)
+    except ConnectTimeout:
+        raise FileDownloadTimeoutError('Download request has timed out')
+    except ReadTimeout:
+        raise FileDownloadTimeoutError('Download request has timed out')
 
-
-def download_file(pdf_dir, link: str, ref_id: int):
-    response = requests.get(link, stream=True, headers=headers)
     filename = urlparse(response.url).path.split('/')[-1]
 
     # if we got a waiting spinner page instead of pdf raise an exception
     if filename == 'waiting-spinner.html':
         raise WaitingSpinnerError('Caught the spinner')
+
+    # if resulting file is not pdf, the throw an error and skip
+    if not filename.lower().endswith('.pdf'):
+        raise NotPDFError('Resulting file is not PDF')
 
     filepath = get_random_directory(pdf_dir, ref_id, filename) / filename
 

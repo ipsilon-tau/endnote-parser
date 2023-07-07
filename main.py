@@ -1,8 +1,8 @@
 import pathlib
 import sqlite3
 import argparse
-from core import download_file, get_download_url, get_xpn_code, WaitingSpinnerError
-
+from core import download_file, get_download_url, get_xpn_code, WaitingSpinnerError, MetaDownloadTimeoutError, \
+    FileDownloadTimeoutError, NotPDFError
 
 parser = argparse.ArgumentParser(description="EndNote parser",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -11,11 +11,18 @@ parser.add_argument("-l",
                     type=int,
                     default=3,
                     help="Limit how much refs to process")
+
 parser.add_argument("-o",
                     "--offset",
                     type=int,
                     default=0,
                     help="Refs offset amount")
+
+parser.add_argument("-t",
+                    "--timeout",
+                    type=int,
+                    default=3,
+                    help="Default request timeout")
 
 parser.add_argument("data-dir",
                     help="Absolute path to *.Data directory location")
@@ -24,6 +31,8 @@ config = vars(args)
 
 limit = config['limit']
 offset = config['offset']
+timeout = config['timeout']
+
 # full path to PROJECT *.Data folder
 DATA_DIR = config['data-dir']
 print(f'Fetching {limit} refs with offset {offset} from {DATA_DIR}')
@@ -75,14 +84,28 @@ for row in sdb_cur.execute(f'SELECT id, URL FROM refs LIMIT {limit} OFFSET {offs
     for pos, url in enumerate(urls):
         # get xpn code from the link
         xpn_code = get_xpn_code(url)
+
         # get download_url from meta page
-        download_url = get_download_url(xpn_code)
         try:
-            pdf_path = download_file(PDF_DIR, download_url, ref_id)
+            download_url = get_download_url(xpn_code, timeout)
+        except MetaDownloadTimeoutError:
+            print(f'Unable to get download link because of the timeout, skipping')
+            continue
+
+        try:
+            pdf_path = download_file(PDF_DIR, download_url, ref_id, timeout)
         except WaitingSpinnerError:
             # not pdf file saved, skip
             print(f'Caught waiting spinner instead of PDF, skipping')
             continue
+        except FileDownloadTimeoutError:
+            print(f'Caught timeout exception while downloading PDF file, skipping')
+            continue
+        except NotPDFError:
+            print(f'Downloaded file is not a PDF, skipping')
+            continue
+
+
         print(f'Saved file {pdf_path} (pos {pos})')
 
         # collect data to files list
