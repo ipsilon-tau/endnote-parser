@@ -13,8 +13,10 @@ USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 headers = {'User-Agent': USER_AGENT}
 
 # full path to initial enl file
-ENL_FILE = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.enl'
-DATA_DIR = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.Data'
+# ENL_FILE = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.enl'
+# DATA_DIR = '/home/evgeny/devel/ipsilon-tau/UpworkVideo/ENL-Sample/Questel-2000-07-06-sample111.Data'
+DATA_DIR = 'C:/Users/waste/devel/ENL-sample-updated/Questel-2000-07-06-sample111.Data'
+
 
 PDF_DIR = pathlib.Path(DATA_DIR) / 'PDF'
 
