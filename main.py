@@ -4,7 +4,6 @@ import argparse
 from core import download_file, get_download_url, get_xpn_code, WaitingSpinnerError
 
 
-
 parser = argparse.ArgumentParser(description="EndNote parser",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-l",
@@ -28,6 +27,7 @@ offset = config['offset']
 # full path to PROJECT *.Data folder
 DATA_DIR = config['data-dir']
 print(f'Fetching {limit} refs with offset {offset} from {DATA_DIR}')
+
 
 PDF_DIR = pathlib.Path(DATA_DIR) / 'PDF'
 
