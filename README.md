@@ -19,3 +19,12 @@
     mkdir devel
     cd devel
     git clone https://github.com/ipsilon-tau/endnote-parser.git
+
+## Install dependencies
+
+    cd endnote-parser
+    poetry install
+
+## Run the program
+
+    poetry run python main.py --limit 3 /home/user/ENL-Sample/Questel-2000-07-06-sample111.Data
