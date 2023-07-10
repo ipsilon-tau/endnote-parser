@@ -10,19 +10,19 @@ parser.add_argument("-l",
                     "--limit",
                     type=int,
                     default=3,
-                    help="Limit how much refs to process")
+                    help="Limit how much references to process. Or in other words, number of references that it will process from this enl project. This number is then used as a part of SQL statement when fetching references from SQLITE database.")
 
 parser.add_argument("-o",
                     "--offset",
                     type=int,
                     default=0,
-                    help="Refs offset amount")
+                    help="How much references should we skip. Useful when we want to skip first N records that we already downloaded during last run.")
 
 parser.add_argument("-t",
                     "--timeout",
                     type=int,
                     default=3,
-                    help="Default request timeout")
+                    help="Default request timeout. Or in other words, amount of second to wait until we consider the download no successfull if the service does not respond at that time. For example timeout=1 will fail almost all the time, but timeout=10 will let most download to complete successfully.")
 
 parser.add_argument("data-dir",
                     help="Absolute path to *.Data directory location")
