@@ -4,6 +4,7 @@ import argparse
 from core import download_file, get_download_url, get_xpn_code, WaitingSpinnerError, MetaDownloadTimeoutError, \
     FileDownloadTimeoutError, NotPDFError
 
+# parse command arguments
 parser = argparse.ArgumentParser(description="EndNote parser",
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-l",
