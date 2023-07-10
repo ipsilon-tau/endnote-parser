@@ -70,8 +70,7 @@ def get_random_directory(pdf_dir: str, ref_id: int, pdf_filename):
     directory_path = pdf_dir / directory_name
 
     # create folder, if folder already exists, then just continue
-    if not os.path.exists(directory_path):
-        os.mkdir(directory_path)
+    os.makedirs(directory_path, exist_ok=True)
     return directory_path
 
 
